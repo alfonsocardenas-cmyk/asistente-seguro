@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Asistente de Seguro</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
+    .container { background: #fff; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,0.08); width: 100%; max-width: 680px; display: flex; flex-direction: column; height: 90vh; max-height: 700px; overflow: hidden; }
+    .header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #eee; }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .avatar { width: 38px; height: 38px; border-radius: 50%; background: #dbeafe; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .header-title { font-size: 15px; font-weight: 600; color: #111; }
+    .header-sub { font-size: 12px; color: #888; margin-top: 1px; }
+    .btn { font-size: 13px; padding: 6px 14px; border-radius: 8px; cursor: pointer; border: 1px solid #ddd; background: #fff; color: #333; transition: background 0.15s; }
+    .btn:hover { background: #f5f5f5; }
+    .poliza-panel { background: #f9f9f9; border-bottom: 1px solid #eee; padding: 14px 18px; }
+    .poliza-panel p { font-size: 13px; color: #555; margin-bottom: 8px; }
+    .poliza-panel textarea { width: 100%; font-size: 13px; border-radius: 8px; border: 1px solid #ddd; padding: 8px 10px; resize: vertical; font-family: inherit; background: #fff; }
+    .poliza-panel textarea:focus { outline: none; border-color: #3b82f6; }
+    .panel-btns { display: flex; gap: 8px; margin-top: 8px; }
+    .btn-primary { background: #111; color: #fff; border-color: #111; font-weight: 500; }
+    .btn-primary:hover { background: #333; }
+    .messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .msg { display: flex; }
+    .msg.user { justify-content: flex-end; }
+    .bubble { max-width: 80%; padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.6; }
+    .bubble.assistant { background: #f1f1f1; color: #111; border-radius: 16px 16px 16px 4px; }
+    .bubble.user { background: #dbeafe; color: #1e3a5f; border-radius: 16px 16px 4px 16px; }
+    .bubble p { margin: 2px 0; }
+    .quick-btns { padding: 0 16px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .quick-btn { font-size: 12px; padding: 5px 11px; border-radius: 20px; cursor: pointer; border: 1px solid #ddd; background: #fff; color: #333; white-space: nowrap; transition: background 0.15s; }
+    .quick-btn:hover { background: #f0f0f0; }
+    .input-row { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #eee; }
+    .input-row input { flex: 1; font-size: 14px; padding: 9px 13px; border-radius: 10px; border: 1px solid #ddd; font-family: inherit; }
+    .input-row input:focus { outline: none; border-color: #3b82f6; }
+    .send-btn { padding: 9px 18px; font-size: 14px; border-radius: 10px; cursor: pointer; border: 1px solid #ddd; background: #111; color: #fff; font-weight: 500; }
+    .send-btn:disabled { background: #ccc; border-color: #ccc; cursor: default; }
+    .typing { font-size: 13px; color: #999; padding: 8px 14px; background: #f1f1f1; border-radius: 16px 16px 16px 4px; max-width: 80px; }
+    input[type="file"] { display: none; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="header-left">
+      <div class="avatar">🛡️</div>
+      <div>
+        <div class="header-title">Asistente de Seguro</div>
+        <div class="header-sub" id="poliza-status">Sin póliza cargada</div>
+      </div>
+    </div>
+    <button class="btn" onclick="togglePanel()">📄 Cargar póliza</button>
+  </div>
+
+  <div class="poliza-panel" id="poliza-panel" style="display:none">
+    <p>Pega el texto de tu póliza, o sube el PDF directamente.</p>
+    <textarea id="poliza-text" rows="4" placeholder="Ej: Seguro de auto GNP, póliza #12345, cobertura amplia, deducible 5%, vigencia dic 2025..."></textarea>
+    <div class="panel-btns">
+      <button class="btn btn-primary" onclick="savePoliza()">Guardar texto</button>
+      <button class="btn" onclick="document.getElementById('pdf-input').click()">📎 Subir PDF</button>
+      <button class="btn" onclick="togglePanel()">Cancelar</button>
+    </div>
+    <input type="file" id="pdf-input" accept=".pdf" onchange="handlePDF(event)" />
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="msg"><div class="bubble assistant"><p>¡Hola! Soy tu asistente de pólizas. Carga tu póliza para que pueda ayudarte a entender tu cobertura, qué hacer en caso de siniestro, y responder cualquier duda.</p></div></div>
+  </div>
+
+  <div class="quick-btns" id="quick-btns">
+    <button class="quick-btn" onclick="send('¿Qué hago si tengo un accidente?')">🚗 ¿Qué hago si tengo un accidente?</button>
+    <button class="quick-btn" onclick="send('¿Qué cubre en caso de robo?')">🔐 ¿Qué cubre en caso de robo?</button>
+    <button class="quick-btn" onclick="send('¿Cuál es mi deducible?')">💰 ¿Cuál es mi deducible?</button>
+    <button class="quick-btn" onclick="send('¿Cuándo vence mi póliza?')">📅 ¿Cuándo vence?</button>
+    <button class="quick-btn" onclick="send('¿Cuál es el número de emergencias?')">📞 Número de emergencias</button>
+  </div>
+
+  <div class="input-row">
+    <input id="user-input" type="text" placeholder="Escribe tu pregunta sobre tu seguro..." onkeydown="if(event.key==='Enter') send()" />
+    <button class="send-btn" id="send-btn" onclick="send()">Enviar</button>
+  </div>
+</div>
+
+<script>
+  const SYSTEM = `Eres un asistente experto en seguros. El usuario te compartirá su póliza y tú responderás preguntas sobre ella de manera clara, simple y en español. En situaciones de emergencia da pasos concretos. Si hay números de teléfono en la póliza, inclúyelos. Si no hay póliza cargada, pide que la proporcionen.`;
+
+  let poliza = '';
+  let history = [];
+  let panelOpen = false;
+
+  function togglePanel() {
+    panelOpen = !panelOpen;
+    document.getElementById('poliza-panel').style.display = panelOpen ? 'block' : 'none';
+    if (panelOpen) document.getElementById('poliza-text').value = poliza;
+  }
+
+  function savePoliza() {
+    poliza = document.getElementById('poliza-text').value.trim();
+    document.getElementById('poliza-status').textContent = poliza ? '✅ Póliza cargada' : 'Sin póliza cargada';
+    togglePanel();
+    if (poliza) addMessage('assistant', '✅ ¡Listo! Ya cargué tu póliza. ¿Qué quieres saber?');
+  }
+
+  async function handlePDF(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const toB64 = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.onerror = rej; r.readAsDataURL(f); });
+    const b64 = await toB64(file);
+    togglePanel();
+    addMessage('user', `📎 ${file.name}`);
+    setLoading(true);
+    try {
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ system: SYSTEM, messages: [{ role: 'user', content: [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
+          { type: 'text', text: 'Analiza esta póliza y dime: tipo de seguro, aseguradora, cobertura principal, deducible y vigencia. Sé breve.' }
+        ]}]}) });
+      const data = await res.json();
+      const reply = data.content?.map(b => b.text).join('') || 'No pude leer el PDF.';
+      poliza = `[PDF: ${file.name}] ${reply}`;
+      document.getElementById('poliza-status').textContent = '✅ Póliza cargada';
+      history = [];
+      addMessage('assistant', reply);
+    } catch { addMessage('assistant', 'Error al leer el PDF.'); }
+    setLoading(false);
+  }
+
+  async function send(text) {
+    const input = document.getElementById('user-input');
+    const msg = text || input.value.trim();
+    if (!msg) return;
+    input.value = '';
+    document.getElementById('quick-btns').style.display = 'none';
+    addMessage('user', msg);
+    history.push({ role: 'user', content: msg });
+    setLoading(true);
+    const systemFull = poliza ? `${SYSTEM}\n\n--- PÓLIZA ---\n${poliza}` : SYSTEM;
+    try {
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ system: systemFull, messages: history }) });
+      const data = await res.json();
+      const reply = data.content?.map(b => b.text).join('') || 'No pude responder.';
+      history.push({ role: 'assistant', content: reply });
+      addMessage('assistant', reply);
+    } catch { addMessage('assistant', 'Error de conexión. Intenta de nuevo.'); }
+    setLoading(false);
+  }
+
+  function addMessage(role, text) {
+    const div = document.getElementById('messages');
+    const wrap = document.createElement('div');
+    wrap.className = `msg ${role}`;
+    const bubble = document.createElement('div');
+    bubble.className = `bubble ${role}`;
+    text.split('\n').forEach(line => { const p = document.createElement('p'); p.textContent = line; bubble.appendChild(p); });
+    wrap.appendChild(bubble);
+    div.appendChild(wrap);
+    div.scrollTop = div.scrollHeight;
+  }
+
+  function setLoading(on) {
+    document.getElementById('send-btn').disabled = on;
+    const div = document.getElementById('messages');
+    if (on) { const t = document.createElement('div'); t.className = 'msg'; t.id = 'typing'; t.innerHTML = '<div class="typing">Pensando...</div>'; div.appendChild(t); div.scrollTop = div.scrollHeight; }
+    else { const t = document.getElementById('typing'); if (t) t.remove(); }
+  }
+</script>
+</body>
+</html>
